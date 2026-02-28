@@ -1,81 +1,73 @@
 import { RotateCcw } from 'lucide-react';
 import { useState } from 'react';
+import type { Board, GameStatus } from '../../../shared/types';
+import { play } from '../lib/api';
 
-type Player = 'X' | 'O' | null;
-type Board = Player[];
+interface TicTacToeProps {
+  walletAddress: string | null;
+}
 
-const WINNING_COMBINATIONS = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6],
-];
+const emptyBoard = (): Board => Array(9).fill(null);
 
-export default function TicTacToe() {
-  const [board, setBoard] = useState<Board>(Array(9).fill(null));
-  const [currentPlayer, setCurrentPlayer] = useState<'X' | 'O'>('X');
-  const [winner, setWinner] = useState<Player | 'draw' | null>(null);
+export default function TicTacToe({ walletAddress }: TicTacToeProps) {
+  const [board, setBoard] = useState<Board>(emptyBoard());
+  const [status, setStatus] = useState<GameStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const checkWinner = (currentBoard: Board): Player | 'draw' | null => {
-    for (const combination of WINNING_COMBINATIONS) {
-      const [a, b, c] = combination;
-      if (
-        currentBoard[a] &&
-        currentBoard[a] === currentBoard[b] &&
-        currentBoard[a] === currentBoard[c]
-      ) {
-        return currentBoard[a];
-      }
-    }
+  const isOver = status !== null && status !== 'ongoing';
 
-    if (currentBoard.every((cell) => cell !== null)) {
-      return 'draw';
-    }
+  const handleCellClick = async (index: number) => {
+    if (!walletAddress || loading || board[index] !== null || isOver) return;
 
-    return null;
-  };
+    setLoading(true);
+    setError(null);
 
-  const handleCellClick = (index: number) => {
-    if (board[index] || winner) return;
-
-    const newBoard = [...board];
-    newBoard[index] = currentPlayer;
-    setBoard(newBoard);
-
-    const gameResult = checkWinner(newBoard);
-    if (gameResult) {
-      setWinner(gameResult);
-    } else {
-      setCurrentPlayer(currentPlayer === 'X' ? 'O' : 'X');
+    try {
+      const result = await play({ address: walletAddress, position: index });
+      setBoard(result.data.board);
+      setStatus(result.data.status);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao contatar o servidor');
+    } finally {
+      setLoading(false);
     }
   };
 
   const resetGame = () => {
-    setBoard(Array(9).fill(null));
-    setCurrentPlayer('X');
-    setWinner(null);
+    setBoard(emptyBoard());
+    setStatus(null);
+    setError(null);
   };
+
+  if (!walletAddress) {
+    return (
+      <div className="flex flex-col items-center gap-4 text-center py-16">
+        <p className="text-xl font-semibold text-slate-600">
+          Conecte sua carteira para jogar
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-8">
       <div className="text-center">
-        {!winner ? (
+        {!isOver ? (
           <p className="text-2xl font-semibold text-slate-700">
-            jogador atual: <span className="text-blue-600">{currentPlayer}</span>
+            {loading
+              ? 'Processando...'
+              : 'Sua vez — você é o O'}
           </p>
         ) : (
           <div className="space-y-4">
             <p className="text-3xl font-bold text-slate-800">
-              {winner === 'draw' ? (
+              {status === 'draw' ? (
                 <span className="text-amber-600">Empate!</span>
+              ) : status === 'won' ? (
+                <span className="text-green-600">Você venceu!</span>
               ) : (
-                <>
-                  Jogador <span className="text-green-600">{winner}</span> venceu!
-                </>
+                <span className="text-red-600">Você perdeu!</span>
               )}
             </p>
             <button
@@ -90,19 +82,22 @@ export default function TicTacToe() {
         )}
       </div>
 
+      {error && (
+        <p className="text-red-600 text-sm">{error}</p>
+      )}
+
       <div className="grid grid-cols-3 gap-3 bg-slate-200 p-4 rounded-xl shadow-xl">
         {board.map((cell, index) => (
           <button
             type="button"
             key={String(index)}
             onClick={() => handleCellClick(index)}
+            disabled={!!cell || isOver || loading}
             className={`w-24 h-24 bg-white rounded-lg font-bold text-4xl transition-all duration-200 shadow-md
-              ${!cell && !winner ? 'hover:bg-slate-50 hover:shadow-lg cursor-pointer' : ''}
+              ${!cell && !isOver && !loading ? 'hover:bg-slate-50 hover:shadow-lg cursor-pointer' : 'cursor-not-allowed'}
               ${cell === 'X' ? 'text-blue-600' : ''}
               ${cell === 'O' ? 'text-red-600' : ''}
-              ${winner ? 'cursor-not-allowed' : ''}
             `}
-            disabled={!!cell || !!winner}
           >
             {cell}
           </button>

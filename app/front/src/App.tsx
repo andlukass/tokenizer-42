@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import TicTacToe from './components/TicTacToe';
-import { connectWallet, disconnectWallet, tryAutoConnect, isOnBase, onAccountsChanged, onChainChanged } from './lib/wallet';
+import { connectWallet, disconnectWallet, isOnBase, onAccountsChanged, onChainChanged, tryAutoConnect } from './lib/wallet';
 
 function App() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -64,7 +64,7 @@ function App() {
       )}
 
       <main className="container mx-auto px-4 py-16 flex items-center justify-center">
-        <TicTacToe />
+        <TicTacToe walletAddress={walletAddress} />
       </main>
     </div>
   );
