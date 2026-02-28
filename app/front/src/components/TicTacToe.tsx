@@ -1,7 +1,9 @@
+import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Board, GameStatus } from '../../../shared/types';
 import { play } from '../lib/api';
+import { db } from '../lib/firebase';
 
 interface TicTacToeProps {
   walletAddress: string | null;
@@ -14,22 +16,51 @@ export default function TicTacToe({ walletAddress }: TicTacToeProps) {
   const [status, setStatus] = useState<GameStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isPlayingRef = useRef(false);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+
+    const q = query(
+      collection(db, 'tokenizer'),
+      where('address', '==', walletAddress.toLowerCase()),
+      where('status', '==', 'ongoing'),
+      limit(1),
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      if (isPlayingRef.current) return;
+      if (!snapshot.empty) {
+        const data = snapshot.docs[0].data();
+        setBoard(data.board as Board);
+        setStatus(data.status as GameStatus);
+      }
+    });
+  }, [walletAddress]);
 
   const isOver = status !== null && status !== 'ongoing';
 
   const handleCellClick = async (index: number) => {
     if (!walletAddress || loading || board[index] !== null || isOver) return;
 
+    const prevBoard = board;
+    const optimisticBoard = [...board] as Board;
+    optimisticBoard[index] = 'O';
+
+    isPlayingRef.current = true;
     setLoading(true);
     setError(null);
+    setBoard(optimisticBoard);
 
     try {
       const result = await play({ address: walletAddress, position: index });
       setBoard(result.data.board);
       setStatus(result.data.status);
     } catch (err: unknown) {
+      setBoard(prevBoard);
       setError(err instanceof Error ? err.message : 'Erro ao contatar o servidor');
     } finally {
+      isPlayingRef.current = false;
       setLoading(false);
     }
   };
@@ -52,7 +83,7 @@ export default function TicTacToe({ walletAddress }: TicTacToeProps) {
 
   return (
     <div className="flex flex-col items-center gap-8">
-      <div className="text-center">
+      <div className="text-center flex flex-col items-center justify-center h-28">
         {!isOver ? (
           <p className="text-2xl font-semibold text-slate-700">
             {loading

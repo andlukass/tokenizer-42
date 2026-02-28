@@ -76,6 +76,26 @@ function getBestMove(board: Board): number {
   return bestMove;
 }
 
+function getRandomMove(board: Board): number {
+  const available: number[] = [];
+  for (let i = 0; i < 9; i++) {
+    if (board[i] === null) available.push(i);
+  }
+  return available[Math.floor(Math.random() * available.length)];
+}
+
+function chooseMachineMove(board: Board, isDumb: boolean): number {
+  if (!isDumb) {
+    return getBestMove(board);
+  }
+
+  return Math.random() < 0.5 ? getRandomMove(board) : getBestMove(board);
+}
+
+// ~45% of games the machine plays randomly, giving the player a real chance to win.
+// Combined with the player winning most random games, this yields ~1 win every 3 games.
+const DUMB_RATE = 0.25;
+
 export const play = onCall<PlayRequest, Promise<PlayResponse>>(async (request) => {
   const { address, position } = request.data;
 
@@ -97,13 +117,17 @@ export const play = onCall<PlayRequest, Promise<PlayResponse>>(async (request) =
     .get();
 
   let board: Board = Array(9).fill(null) as Board;
+  let isDumb = false;
   let docRef: admin.firestore.DocumentReference;
 
   if (!snapshot.empty) {
+    const data = snapshot.docs[0].data();
     docRef = snapshot.docs[0].ref;
-    board = snapshot.docs[0].data().board;
+    board = data.board;
+    isDumb = data.isDumb as boolean;
   } else {
     docRef = db.collection("tokenizer").doc();
+    isDumb = Math.random() < DUMB_RATE;
   }
 
   if (board[position] !== null) {
@@ -120,8 +144,8 @@ export const play = onCall<PlayRequest, Promise<PlayResponse>>(async (request) =
   } else if (board.every((c) => c !== null)) {
     status = "draw";
   } else {
-    // Machine plays 'X' using minimax
-    const machineMove = getBestMove(board);
+    // Machine plays 'X'
+    const machineMove = chooseMachineMove(board, isDumb);
     board[machineMove] = "X";
 
     if (checkWinner(board) === "X") {
@@ -135,6 +159,7 @@ export const play = onCall<PlayRequest, Promise<PlayResponse>>(async (request) =
     address: address.toLowerCase(),
     board,
     status,
+    isDumb,
   });
 
   logger.info("play", { address: address.toLowerCase(), status });

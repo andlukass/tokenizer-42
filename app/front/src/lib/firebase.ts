@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
+import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDUsjdnS8TFSqKa1Y8YXnExlLfGtYKKXpc",
@@ -13,6 +14,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const functions = getFunctions(app, "us-central1");
+export const db = getFirestore(app);
 
 // if (import.meta.env.MODE === "development") {
 //   connectFunctionsEmulator(functions, "localhost", 5001);

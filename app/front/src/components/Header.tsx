@@ -12,7 +12,7 @@ function shortenAddress(address: string): string {
 export default function Header({ walletAddress, wrongNetwork, onConnect, onDisconnect }: HeaderProps) {
   return (
     <header className="bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-lg">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+      <div className="container mx-auto px-4 py-4 flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Tokenizer 42</h1>
 
         <div className="flex items-center gap-3">
