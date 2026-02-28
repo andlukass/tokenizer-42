@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.34;
 
-contract MyToken {
-    string public name = "MyToken";
-    string public symbol = "MTK";
-    uint8 public decimals = 18;
+contract TicTacToe42 {
+    string public name = "TicTacToe42";
+    string public symbol = "T42";
+    uint8 public decimals = 0;
     uint256 public totalSupply;
+
+    address public admin;
 
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
@@ -13,8 +15,14 @@ contract MyToken {
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "not admin");
+        _;
+    }
+
     constructor(uint256 _initialSupply) {
-        totalSupply = _initialSupply * 1e18;
+        admin = msg.sender;
+        totalSupply = _initialSupply;
         balanceOf[msg.sender] = totalSupply;
         emit Transfer(address(0), msg.sender, totalSupply);
     }
@@ -42,6 +50,13 @@ contract MyToken {
         balanceOf[to] += value;
 
         emit Transfer(from, to, value);
+        return true;
+    }
+
+    function mint(address to, uint256 value) public onlyAdmin returns (bool) {
+        totalSupply += value;
+        balanceOf[to] += value;
+        emit Transfer(address(0), to, value);
         return true;
     }
 }
