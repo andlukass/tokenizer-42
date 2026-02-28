@@ -1,7 +1,7 @@
+import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import solc from "solc"
-import fs from "fs"
-import path from "path"
-import { fileURLToPath } from "url"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const source = fs.readFileSync(path.join(__dirname, "../code/Token.sol"), "utf8")
@@ -21,7 +21,7 @@ const input = {
 }
 
 const output = JSON.parse(solc.compile(JSON.stringify(input)))
-const contract = output.contracts["Token.sol"]["MyToken"]
+const contract = output.contracts["Token.sol"].TicTacToe42
 
 fs.writeFileSync(path.join(__dirname, "./abi.json"), JSON.stringify(contract.abi, null, 2))
 fs.writeFileSync(path.join(__dirname, "./bytecode.txt"), contract.evm.bytecode.object)

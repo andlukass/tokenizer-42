@@ -23,7 +23,7 @@ const client = createWalletClient({
 const hash = await client.deployContract({
   abi,
   bytecode,
-  args: [1000000n]
+  args: [100n]
 })
 
 console.log("Deploy tx:", hash)
