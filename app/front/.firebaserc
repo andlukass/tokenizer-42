@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "lucasandrade-5246f"
+  },
+  "targets": {
+    "lucasandrade-5246f": {
+      "hosting": {
+        "tokenizer": [
+          "tokenizer-42"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
