@@ -1,6 +1,7 @@
 import { collection, limit, onSnapshot, query, where } from 'firebase/firestore';
 import { RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import Confetti from 'react-confetti';
 import type { Board, GameStatus } from '../../../shared/types';
 import { play } from '../lib/api';
 import { db } from '../lib/firebase';
@@ -40,6 +41,7 @@ export default function TicTacToe({ walletAddress }: TicTacToeProps) {
   }, [walletAddress]);
 
   const isOver = status !== null && status !== 'ongoing';
+  const showConfetti = status === 'won';
 
   const handleCellClick = async (index: number) => {
     if (!walletAddress || loading || board[index] !== null || isOver) return;
@@ -59,7 +61,7 @@ export default function TicTacToe({ walletAddress }: TicTacToeProps) {
       setStatus(result.data.status);
     } catch (err: unknown) {
       setBoard(prevBoard);
-      setError(err instanceof Error ? err.message : 'Erro ao contatar o servidor');
+      setError(err instanceof Error ? err.message : 'Error contacting the server');
     } finally {
       isPlayingRef.current = false;
       setLoading(false);
@@ -76,30 +78,41 @@ export default function TicTacToe({ walletAddress }: TicTacToeProps) {
     return (
       <div className="flex flex-col items-center gap-4 text-center py-16">
         <p className="text-xl font-semibold text-slate-600">
-          Conecte sua carteira para jogar
+          Connect your wallet to play
         </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-8">
+    <>
+      {showConfetti && (
+        <Confetti
+          recycle={false}
+          numberOfPieces={300}
+        />
+      )}
+      <div className="flex flex-col items-center gap-8">
       <div className="text-center flex flex-col items-center justify-center h-28">
         {!isOver ? (
           <p className="text-2xl font-semibold text-slate-700">
             {loading
-              ? 'Processando...'
-              : 'Sua vez — você é o O'}
+              ? 'Processing...'
+              : (
+                <>
+                  Your turn - you are "<span className="font-bold text-red-600">O</span>"
+                </>
+              )}
           </p>
         ) : (
           <div className="space-y-4">
             <p className="text-3xl font-bold text-slate-800">
               {status === 'draw' ? (
-                <span className="text-amber-600">Empate!</span>
+                <span className="text-amber-600">Draw!</span>
               ) : status === 'won' ? (
-                <span className="text-green-600">Você venceu!</span>
+                <span className="text-green-600">Congratulations, you won 10 T42 tokens!</span>
               ) : (
-                <span className="text-red-600">Você perdeu!</span>
+                <span className="text-red-600">You lost!</span>
               )}
             </p>
             <button
@@ -108,7 +121,7 @@ export default function TicTacToe({ walletAddress }: TicTacToeProps) {
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 flex items-center gap-2 mx-auto"
             >
               <RotateCcw size={20} />
-              Jogar Novamente
+              Play Again
             </button>
           </div>
         )}
@@ -135,6 +148,7 @@ export default function TicTacToe({ walletAddress }: TicTacToeProps) {
           </button>
         ))}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

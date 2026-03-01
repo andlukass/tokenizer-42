@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import TicTacToe from './components/TicTacToe';
-import { connectWallet, disconnectWallet, isOnBase, onAccountsChanged, onChainChanged, tryAutoConnect } from './lib/wallet';
+import { connectWallet, disconnectWallet, isEvmNetwork, onAccountsChanged, onChainChanged, tryAutoConnect } from './lib/wallet';
 
 function App() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -12,7 +12,7 @@ function App() {
     tryAutoConnect().then(async (address) => {
       if (address) {
         setWalletAddress(address);
-        setWrongNetwork(!(await isOnBase()));
+        setWrongNetwork(!(await isEvmNetwork()));
       }
     });
 
@@ -21,8 +21,8 @@ function App() {
       if (!address) setWrongNetwork(false);
     });
 
-    const unsubChain = onChainChanged((onBase) => {
-      setWrongNetwork(!onBase);
+    const unsubChain = onChainChanged((isEvm) => {
+      setWrongNetwork(!isEvm);
     });
 
     return () => {

@@ -65,6 +65,18 @@ export async function isOnBase(): Promise<boolean> {
   return chainId === BASE_CHAIN_ID;
 }
 
+export async function isEvmNetwork(): Promise<boolean> {
+  const provider = getProvider();
+  if (!provider) return false;
+
+  try {
+    const chainId: unknown = await provider.request({ method: 'eth_chainId' });
+    return typeof chainId === 'string' && chainId.startsWith('0x');
+  } catch {
+    return false;
+  }
+}
+
 // EIP-1193 has no disconnect — callers just clear local state
 export function disconnectWallet(): void {}
 
@@ -77,11 +89,11 @@ export function onAccountsChanged(cb: (address: string | null) => void): () => v
   return () => provider.removeListener('accountsChanged', handler);
 }
 
-export function onChainChanged(cb: (isBase: boolean) => void): () => void {
+export function onChainChanged(cb: (isEvm: boolean) => void): () => void {
   const provider = getProvider();
   if (!provider) return () => {};
 
-  const handler = (chainId: string) => cb(chainId === BASE_CHAIN_ID);
+  const handler = (chainId: string) => cb(typeof chainId === 'string' && chainId.startsWith('0x'));
   provider.on('chainChanged', handler);
   return () => provider.removeListener('chainChanged', handler);
 }
