@@ -33,6 +33,7 @@ export default function TicTacToe({ walletAddress }: TicTacToeProps) {
       if (!snapshot.empty) {
         const data = snapshot.docs[0].data();
         setBoard(data.board as Board);
+        console.log("isDumb", data.isDumb);
         setStatus(data.status as GameStatus);
       }
     });

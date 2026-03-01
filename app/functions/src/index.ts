@@ -2,6 +2,10 @@ import * as admin from "firebase-admin";
 import { setGlobalOptions } from "firebase-functions";
 import { onCall } from "firebase-functions/https";
 import * as logger from "firebase-functions/logger";
+import { defineSecret } from "firebase-functions/params";
+import { createWalletClient, http } from "viem";
+import { mnemonicToAccount } from "viem/accounts";
+import { base } from "viem/chains";
 import type { Board, Cell, GameStatus, PlayRequest, PlayResponse } from "../../shared/types.js";
 
 admin.initializeApp();
@@ -9,6 +13,23 @@ admin.initializeApp();
 const db = admin.firestore();
 
 setGlobalOptions({ maxInstances: 10 });
+
+const mnemonic = defineSecret("MNEMONIC");
+
+const CONTRACT_ADDRESS = "0x3118b6f48adc4b3000f0b30786e9ab7a7d16929c" as const;
+
+const mintAbi = [
+  {
+    inputs: [
+      { internalType: "address", name: "to", type: "address" },
+      { internalType: "uint256", name: "value", type: "uint256" },
+    ],
+    name: "mint",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
 
 const WINNING_COMBINATIONS = [
   [0, 1, 2],
@@ -96,73 +117,103 @@ function chooseMachineMove(board: Board, isDumb: boolean): number {
 // Combined with the player winning most random games, this yields ~1 win every 3 games.
 const DUMB_RATE = 0.25;
 
-export const play = onCall<PlayRequest, Promise<PlayResponse>>(async (request) => {
-  const { address, position } = request.data;
+export const play = onCall<PlayRequest, Promise<PlayResponse>>(
+  { secrets: [mnemonic] },
+  async (request) => {
+    const { address, position } = request.data;
 
-  if (
-    !address ||
-    typeof position !== "number" ||
-    position < 0 ||
-    position > 8 ||
-    !Number.isInteger(position)
-  ) {
-    throw new Error("Invalid request");
-  }
+    if (
+      !address ||
+      typeof position !== "number" ||
+      position < 0 ||
+      position > 8 ||
+      !Number.isInteger(position)
+    ) {
+      throw new Error("Invalid request");
+    }
 
-  const snapshot = await db
-    .collection("tokenizer")
-    .where("address", "==", address.toLowerCase())
-    .where("status", "==", "ongoing")
-    .limit(1)
-    .get();
+    const snapshot = await db
+      .collection("tokenizer")
+      .where("address", "==", address.toLowerCase())
+      .where("status", "==", "ongoing")
+      .limit(1)
+      .get();
 
-  let board: Board = Array(9).fill(null) as Board;
-  let isDumb = false;
-  let docRef: admin.firestore.DocumentReference;
+    let board: Board = Array(9).fill(null) as Board;
+    let isDumb = false;
+    let docRef: admin.firestore.DocumentReference;
 
-  if (!snapshot.empty) {
-    const data = snapshot.docs[0].data();
-    docRef = snapshot.docs[0].ref;
-    board = data.board;
-    isDumb = data.isDumb as boolean;
-  } else {
-    docRef = db.collection("tokenizer").doc();
-    isDumb = Math.random() < DUMB_RATE;
-  }
+    if (!snapshot.empty) {
+      const data = snapshot.docs[0].data();
+      docRef = snapshot.docs[0].ref;
+      board = data.board;
+      isDumb = data.isDumb as boolean;
+    } else {
+      docRef = db.collection("tokenizer").doc();
+      isDumb = Math.random() < DUMB_RATE;
+    }
 
-  if (board[position] !== null) {
-    throw new Error("Position already taken");
-  }
+    if (board[position] !== null) {
+      throw new Error("Position already taken");
+    }
 
-  // Player plays 'O'
-  board[position] = "O";
+    // Player plays 'O'
+    board[position] = "O";
 
-  let status: GameStatus = "ongoing";
+    let status: GameStatus = "ongoing";
 
-  if (checkWinner(board) === "O") {
-    status = "won";
-  } else if (board.every((c) => c !== null)) {
-    status = "draw";
-  } else {
-    // Machine plays 'X'
-    const machineMove = chooseMachineMove(board, isDumb);
-    board[machineMove] = "X";
-
-    if (checkWinner(board) === "X") {
-      status = "lost";
+    if (checkWinner(board) === "O") {
+      status = "won";
     } else if (board.every((c) => c !== null)) {
       status = "draw";
+    } else {
+      // Machine plays 'X'
+      const machineMove = chooseMachineMove(board, isDumb);
+      board[machineMove] = "X";
+
+      if (checkWinner(board) === "X") {
+        status = "lost";
+      } else if (board.every((c) => c !== null)) {
+        status = "draw";
+      }
     }
+
+    await docRef.set({
+      address: address.toLowerCase(),
+      board,
+      status,
+      isDumb,
+    });
+
+    if (status === "won") {
+      try {
+        if (!mnemonic.value()) throw new Error("MNEMONIC is not set");
+        const account = mnemonicToAccount(mnemonic.value());
+        const walletClient = createWalletClient({
+          account,
+          chain: base,
+          transport: http(),
+        });
+        const txHash = await walletClient.writeContract({
+          address: CONTRACT_ADDRESS,
+          abi: mintAbi,
+          functionName: "mint",
+          args: [address as `0x${string}`, BigInt(10)],
+        });
+        logger.info("mint sent", { address: address.toLowerCase(), txHash });
+      } catch (err) {
+        const e = err as Error;
+        logger.error("mint failed", {
+          address: address.toLowerCase(),
+          message: e.message,
+          name: e.name,
+          stack: e.stack,
+        });
+      }
+    }
+
+    logger.info("play", { address: address.toLowerCase(), status });
+
+    return { board, status };
   }
-
-  await docRef.set({
-    address: address.toLowerCase(),
-    board,
-    status,
-    isDumb,
-  });
-
-  logger.info("play", { address: address.toLowerCase(), status });
-
-  return { board, status };
-});
+);
